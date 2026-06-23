@@ -1,4 +1,4 @@
-#define MyAppId "{4DCA77C4-0D35-4AE3-B4AA-FB4A4D699332}"
+#define MyAppId "4DCA77C4-0D35-4AE3-B4AA-FB4A4D699332"
 #define MyAppName "Leitura Bíblica"
 #define MyAppVersion "1.1.0"
 #define MyAppPublisher "Lucas Carbone Vieira"
@@ -6,7 +6,7 @@
 #define MyOutputBaseName "Setup_Leitura_Biblica_v" + MyAppVersion
 
 [Setup]
-AppId={#MyAppId}
+AppId={{{#MyAppId}}}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}

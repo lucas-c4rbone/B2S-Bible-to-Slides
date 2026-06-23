@@ -3,6 +3,7 @@
 import subprocess
 import threading
 import tkinter as tk
+import webbrowser
 from datetime import datetime
 from typing import Any
 
@@ -17,6 +18,25 @@ from core.scripture import ler_texto_entrada
 from core.utils import GeradorSalmosError
 from ui.animations import FluentAnimations
 from ui.theme import (
+    ANIM_FAST,
+    ANIM_CARD_DIM,
+    ANIM_CARD_UNDIM,
+    ANIM_DELAY_CLIPBOARD,
+    ANIM_DELAY_CORNERS,
+    ANIM_DELAY_SCALE,
+    ANIM_DELAY_WIRE,
+    ANIM_ELEVATION_PULSE,
+    ANIM_ENTRANCE_DELAYS,
+    ANIM_FADE_IN,
+    ANIM_FPS,
+    ANIM_FRAME_MS,
+    ANIM_NORMAL,
+    ANIM_PRESS_RESTORE,
+    ANIM_PROGRESS_ENTRANCE,
+    ANIM_SLOW,
+    ANIM_STARTUP_MIN_VISIBLE,
+    ANIM_STARTUP_POLL,
+    ANIM_STATUS,
     APP_AUTHOR,
     APP_NAME,
     APP_VERSION,
@@ -59,6 +79,7 @@ class Aplicacao(ctk.CTk):
     """Main application window for scripture-to-PowerPoint generation."""
 
     _SCRIPTURE_PLACEHOLDER = "Cole aqui o texto copiado do Busca."
+    _BUSCA_URL = "https://busca.tabernaculodafe.org.br/"
 
     def __init__(self) -> None:
         """Initialize widgets, state, and startup animations."""
@@ -107,7 +128,7 @@ class Aplicacao(ctk.CTk):
         self._restaurar_geometria()
         self.protocol("WM_DELETE_WINDOW", self._fechar)
         self.bind_all("<Control-Return>", self._atalho_gerar)
-        self.after(250, self._perguntar_clipboard_inicial)
+        self.after(ANIM_DELAY_CLIPBOARD, self._perguntar_clipboard_inicial)
         self._schedule_splash_close(self._create_splash_screen())
 
         logger.info("Window initialised | geometry=%s", self.geometry())
@@ -175,7 +196,7 @@ class Aplicacao(ctk.CTk):
         return splash
 
     def _schedule_splash_close(self, splash: tk.Toplevel) -> None:
-        min_visible_ms = 500
+        min_visible_ms = ANIM_STARTUP_MIN_VISIBLE
 
         def _hide_splash() -> None:
             try:
@@ -188,7 +209,7 @@ class Aplicacao(ctk.CTk):
             if self._startup_ready:
                 _hide_splash()
             else:
-                self.after(80, _check_ready)
+                self.after(ANIM_STARTUP_POLL, _check_ready)
 
         def _close_splash() -> None:
             elapsed = int((datetime.now().timestamp() - self._splash_start_time) * 1000)
@@ -221,7 +242,7 @@ class Aplicacao(ctk.CTk):
             except (tk.TclError, AttributeError, ValueError, TypeError) as exc:
                 logger.debug("Ignored UI operation error: %s", exc, exc_info=True)
 
-        self.tween(260, _update, ease=self.ease_out_cubic, on_done=_finish)
+        self.tween(ANIM_FADE_IN, _update, ease=self.ease_out_cubic, on_done=_finish)
 
     def _mark_startup_ready(self) -> None:
         self._startup_ready = True
@@ -361,7 +382,7 @@ class Aplicacao(ctk.CTk):
             except (tk.TclError, AttributeError, ValueError, TypeError) as exc:
                 logger.debug("Ignored UI operation error: %s", exc, exc_info=True)
 
-        self.after(60, _force_uniform_corners)
+        self.after(ANIM_DELAY_CORNERS, _force_uniform_corners)
 
         self._range_visible = False
         self._range_toggle_btn = ctk.CTkButton(range_outer, text="▶  Intervalo de versículos  (opcional)", command=self._toggle_range_section, fg_color=BG_TILE, text_color=FG_LABEL, hover_color=BG_TILE, font=(FONT_FAMILY, 12, "bold"), cursor="hand2", anchor="w", corner_radius=RADIUS_TILE)
@@ -386,13 +407,27 @@ class Aplicacao(ctk.CTk):
         btn_row = ctk.CTkFrame(inner, fg_color=BG_TILE, corner_radius=RADIUS_TILE, border_width=1, border_color=CARD_BORDER)
         btn_row.grid(row=9, column=0, sticky="e", pady=(24, 0), padx=(0, 0))
         self._btn_row_ref = btn_row
+        self._botao_abrir_busca = ctk.CTkButton(
+            btn_row,
+            text="🌐  Abrir Busca",
+            command=self._abrir_site_busca,
+            fg_color=BG_TILE,
+            text_color=FG_LABEL,
+            hover_color=BG_CARD_INNER,
+            font=(FONT_FAMILY, 13),
+            cursor="hand2",
+            corner_radius=RADIUS_PILL,
+            width=140,
+            height=44,
+        )
+        self._botao_abrir_busca.grid(row=0, column=0, pady=10, padx=(10, 0))
         self.botao_gerar = FluentWidgets.primary_button(btn_row, f"  {ICON_PLAY}  Gerar PowerPoint  (Ctrl+Enter)", self.gerar, GRAD_START, GRAD_MID)
-        self.botao_gerar.grid(row=0, column=0, pady=10, padx=10)
+        self.botao_gerar.grid(row=0, column=1, pady=10, padx=10)
 
         self._footer_lbl = ctk.CTkLabel(outer, text=self._footer_text(), fg_color=BG_APP, text_color="#5a649a", font=(FONT_FAMILY, 11))
         self._footer_lbl.grid(row=3, column=0, pady=(2, 6))
 
-        self.after(10, self._wire_fluent_animations)
+        self.after(ANIM_DELAY_WIRE, self._wire_fluent_animations)
 
     def _field_label(self, parent, text: str, row: int) -> None:
         FluentWidgets.field_label(parent, text, row)
@@ -455,7 +490,7 @@ class Aplicacao(ctk.CTk):
         novo = atual + (passo if diferenca > 0 else -passo)
         self.progresso_var.set(novo)
         self._redraw_progress()
-        self.after(16, self._animar_progresso)
+        self.after(ANIM_FRAME_MS, self._animar_progresso)
 
     def _set_status(self, msg: str, color: str = FG_HINT) -> None:
         try:
@@ -572,10 +607,11 @@ class Aplicacao(ctk.CTk):
         self.entry_titulo.configure(state=estado)
         self.entry_verso_de.configure(state=estado)
         self.entry_verso_ate.configure(state=estado)
+        self._botao_abrir_busca.configure(state=estado)
         self.botao_gerar.configure(state=estado, fg_color="#163060" if gerando else GRAD_START)
         if self._card_ref is not None:
             if gerando:
-                self._elevation_pulse(self._card_ref, duration_ms=400)
+                self._elevation_pulse(self._card_ref, duration_ms=ANIM_ELEVATION_PULSE)
                 self._progress_connected_entrance()
             else:
                 self._card_opacity_transition(self._card_ref, dim=False)
@@ -588,6 +624,19 @@ class Aplicacao(ctk.CTk):
         self.verso_de_var.set("")
         self.verso_ate_var.set("")
         self.scripture_text.focus_set()
+
+    def _abrir_site_busca(self) -> None:
+        try:
+            webbrowser.open_new_tab(self._BUSCA_URL)
+            self._set_status("Site Busca aberto no navegador padrão.", FG_HINT)
+            logger.info("Busca website opened | url=%s", self._BUSCA_URL)
+        except (webbrowser.Error, OSError, RuntimeError, ValueError, TypeError):
+            logger.exception("Could not open Busca website")
+            messagebox.showerror(
+                "Não foi possível abrir o site",
+                "Não foi possível abrir o site do Busca no navegador padrão.",
+                parent=self,
+            )
 
     def _toggle_range_section(self) -> None:
         self._range_visible = not self._range_visible
@@ -814,8 +863,8 @@ class Aplicacao(ctk.CTk):
         self.scripture_text.focus_set()
 
     def _wire_fluent_animations(self) -> None:
-        self.after(60, self.scale_in_window)
-        delays = [0, 50, 110, 190, 240, 290]
+        self.after(ANIM_DELAY_SCALE, self.scale_in_window)
+        delays = ANIM_ENTRANCE_DELAYS
         entrance_targets = [
             (self._header_ref, {"pady": (36, 0), "padx": 36}, delays[0], 14),
             (self._div_ref, {"pady": 22, "padx": 36}, delays[1], 0),
@@ -830,11 +879,11 @@ class Aplicacao(ctk.CTk):
 
         self.attach_reveal(self._card_ref)
         self.attach_press_animation(self.botao_gerar)
-        self.attach_hover_lift(self.botao_gerar, lift_px=3)
+        self.attach_hover_brighten(self.botao_gerar, amount=0.2)
         self.attach_hover_lift(self._range_toggle_btn, lift_px=2)
         for entry in (self.entry_titulo, self.entry_verso_de, self.entry_verso_ate):
             self.attach_acrylic_focus(entry)
-        self.attach_focus_reveal(self.scripture_text, normal_border=INPUT_BORDER, reveal_border=INPUT_BORDER_FOC, duration_ms=200)
+        self.attach_focus_reveal(self.scripture_text, normal_border=INPUT_BORDER, reveal_border=INPUT_BORDER_FOC, duration_ms=ANIM_STATUS)
         if self._card_ref is not None:
             self._attach_floating_shadow(self._card_ref, self._card_ref.master)
 
@@ -849,9 +898,9 @@ class Aplicacao(ctk.CTk):
 
         def _fade_out_done() -> None:
             self.status_var.set(new_text)
-            self.fade_widget(self.status_lbl, BG_CARD, new_color, duration_ms=200, attr="text_color")
+            self.fade_widget(self.status_lbl, BG_CARD, new_color, duration_ms=ANIM_STATUS, attr="text_color")
 
-        self.fade_widget(self.status_lbl, current_color, BG_CARD, duration_ms=200, attr="text_color", on_done=_fade_out_done)
+        self.fade_widget(self.status_lbl, current_color, BG_CARD, duration_ms=ANIM_STATUS, attr="text_color", on_done=_fade_out_done)
 
     def _progress_connected_entrance(self) -> None:
         def _update(t: float) -> None:
@@ -869,7 +918,7 @@ class Aplicacao(ctk.CTk):
             except (tk.TclError, AttributeError, ValueError, TypeError) as exc:
                 logger.debug("Ignored UI operation error: %s", exc, exc_info=True)
 
-        self.tween(300, _update, ease=self.ease_spring, on_done=_finish)
+        self.tween(ANIM_PROGRESS_ENTRANCE, _update, ease=self.ease_spring, on_done=_finish)
 
     def _animate_range_show(self) -> None:
         try:
@@ -887,7 +936,7 @@ class Aplicacao(ctk.CTk):
             except (tk.TclError, AttributeError, ValueError, TypeError) as exc:
                 logger.debug("Ignored UI operation error: %s", exc, exc_info=True)
 
-        self.tween(220, _update, ease=self.ease_out_cubic)
+        self.tween(ANIM_NORMAL, _update, ease=self.ease_out_cubic)
 
     def _animate_range_hide(self, on_done=None) -> None:
         def _update(t: float) -> None:
@@ -908,7 +957,7 @@ class Aplicacao(ctk.CTk):
             if on_done:
                 on_done()
 
-        self.tween(220, _update, ease=self.ease_in_cubic, on_done=_done)
+        self.tween(ANIM_NORMAL, _update, ease=self.ease_in_cubic, on_done=_done)
 
     def _elevation_pulse(self, widget, duration_ms: int = 400) -> None:
         half = duration_ms // 2
@@ -950,7 +999,7 @@ class Aplicacao(ctk.CTk):
 
         dim_color = BG_CARD_INNER
         to_color = dim_color if dim else CARD_BORDER
-        self.fade_widget(widget, from_color, to_color, duration_ms=300 if dim else 400, attr="border_color", cancel_token=self._card_opacity_token)
+        self.fade_widget(widget, from_color, to_color, duration_ms=ANIM_CARD_DIM if dim else ANIM_CARD_UNDIM, attr="border_color", cancel_token=self._card_opacity_token)
 
     def _make_vertical_gradient_image(self, width: int, height: int, top_rgb: tuple[int, int, int], bottom_rgb: tuple[int, int, int], radius: int = 0):
         if not (PIL_AVAILABLE and ctk.CTkImage is not None):
@@ -979,7 +1028,7 @@ class Aplicacao(ctk.CTk):
             logger.exception("Could not render gradient image")
             return None
 
-    def tween(self, duration_ms: int, on_update, ease=None, on_done=None, fps: int = 60, cancel_token: list | None = None) -> None:
+    def tween(self, duration_ms: int, on_update, ease=None, on_done=None, fps: int = ANIM_FPS, cancel_token: list | None = None) -> None:
         """Proxy to animation tween helper.
 
         Args:
@@ -1049,7 +1098,7 @@ class Aplicacao(ctk.CTk):
         """
         return FluentAnimations.ease_spring(t)
 
-    def fade_widget(self, widget, from_color: str, to_color: str, duration_ms: int = 220, attr: str = "text_color", on_done=None, cancel_token: list | None = None) -> None:
+    def fade_widget(self, widget, from_color: str, to_color: str, duration_ms: int = ANIM_NORMAL, attr: str = "text_color", on_done=None, cancel_token: list | None = None) -> None:
         """Proxy to widget color fade helper.
 
         Args:
@@ -1081,7 +1130,7 @@ class Aplicacao(ctk.CTk):
         """Proxy to top-level scale-in animation."""
         return FluentAnimations.scale_in_window(self)
 
-    def attach_reveal(self, widget, normal_border: str = CARD_BORDER, reveal_border: str = GRAD_START, duration_ms: int = 180) -> None:
+    def attach_reveal(self, widget, normal_border: str = CARD_BORDER, reveal_border: str = GRAD_START, duration_ms: int = ANIM_PRESS_RESTORE) -> None:
         """Proxy to hover reveal border animation.
 
         Args:
@@ -1092,7 +1141,7 @@ class Aplicacao(ctk.CTk):
         """
         return FluentAnimations.attach_reveal(self, widget, normal_border=normal_border, reveal_border=reveal_border, duration_ms=duration_ms)
 
-    def attach_focus_reveal(self, widget, normal_border: str = CARD_BORDER, reveal_border: str = GRAD_START, duration_ms: int = 200) -> None:
+    def attach_focus_reveal(self, widget, normal_border: str = CARD_BORDER, reveal_border: str = GRAD_START, duration_ms: int = ANIM_STATUS) -> None:
         """Proxy to focus border reveal animation.
 
         Args:
@@ -1103,7 +1152,7 @@ class Aplicacao(ctk.CTk):
         """
         return FluentAnimations.attach_focus_reveal(self, widget, normal_border=normal_border, reveal_border=reveal_border, duration_ms=duration_ms)
 
-    def attach_hover_lift(self, widget, lift_px: int = 3, duration_ms: int = 140) -> None:
+    def attach_hover_lift(self, widget, lift_px: int = 3, duration_ms: int = ANIM_FAST) -> None:
         """Proxy to hover lift motion animation.
 
         Args:
@@ -1112,6 +1161,16 @@ class Aplicacao(ctk.CTk):
             duration_ms: Transition duration in milliseconds.
         """
         return FluentAnimations.attach_hover_lift(self, widget, lift_px=lift_px, duration_ms=duration_ms)
+
+    def attach_hover_brighten(self, widget, amount: float = 0.18, duration_ms: int = ANIM_FAST) -> None:
+        """Proxy to hover brighten animation.
+
+        Args:
+            widget: Target widget.
+            amount: Brightening intensity.
+            duration_ms: Transition duration in milliseconds.
+        """
+        return FluentAnimations.attach_hover_brighten(self, widget, amount=amount, duration_ms=duration_ms)
 
     def attach_press_animation(self, widget) -> None:
         """Proxy to press/release button feedback animation.
